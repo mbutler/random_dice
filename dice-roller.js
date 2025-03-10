@@ -1,7 +1,11 @@
 import { fetch } from 'undici';
 import { DiceRoller, DiscordRollRenderer } from 'dice-roller-parser';
+import dotenv from 'dotenv';
 
-const apiKey = '';
+// Load environment variables from .env file
+dotenv.config();
+
+const apiKey = process.env.RANDOM_ORG_API_KEY;
 
 async function fetchFromRandomOrg(count) {
   const url = 'https://api.random.org/json-rpc/4/invoke';
@@ -38,7 +42,6 @@ async function rollDice(diceString) {
   const randomNumbers = await fetchFromRandomOrg(dieCount);
   let index = 0;
 
-  // Use random.org numbers in the DiceRoller constructor
   const diceRoller = new DiceRoller(() => {
     if (index >= randomNumbers.length) throw new Error('Not enough random numbers');
     return randomNumbers[index++]; // 0-1 range, perfect for DiceRoller
@@ -48,7 +51,6 @@ async function rollDice(diceString) {
   const renderer = new DiscordRollRenderer();
   return {
     total: roll.value,
-    details: roll,
     discord: renderer.render(roll)
   };
 }
@@ -69,13 +71,24 @@ async function rollDice(diceString) {
  * - Inline: [[expression]] (e.g., "[[2d20kh1]]" - inline roll)
  */
 
+// CLI logic
 (async () => {
+  // Get dice notation from command-line arguments
+  const args = process.argv.slice(2);
+  const diceString = args.join(' ').trim();
+
+  if (!diceString) {
+    console.error('Please provide dice notation as an argument.');
+    console.error('Example: bun dice.js "3d6kh2 + 2d8>6"');
+    process.exit(1);
+  }
+
   try {
-    const result = await rollDice("3d6kh2 + 2d8>6");
-    console.log(`Total: ${result.total}`);
-    console.log("Details:", JSON.stringify(result.details, null, 2));
-    console.log(`Discord: ${result.discord}`);
+    if (!apiKey) throw new Error('API key is missing. Please set RANDOM_ORG_API_KEY in your .env file.');
+    const result = await rollDice(diceString);
+    console.log(`${diceString} = ${result.total} (${result.discord})`);
   } catch (error) {
-    console.error('Rolling dice failed:', error);
+    console.error('Rolling dice failed:', error.message);
+    process.exit(1);
   }
 })();
